@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROA Agentic Orchestrator</title>
+<style>
+  :root { color-scheme: light dark;
+    --bg:#f4f4f2; --panel:#fcfcfb; --line:#dcdbd5; --ink:#0b0b0b; --ink2:#52514e; --mut:#797870;
+    --blue:#2a78d6; --good:#1a7f4b; --bad:#c93a39; --warn:#a86b00; --hil:#eda100; --soft:#f0efeb; }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#121211; --panel:#1a1a19; --line:#33322f; --ink:#fff; --ink2:#c3c2b7; --mut:#8c8b82;
+    --blue:#3987e5; --good:#3fb97f; --bad:#e66767; --warn:#e0a13a; --hil:#c98500; --soft:#242422; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:13px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:14px; padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0; } header .grow { flex:1; }
+  a.btn, button { background:var(--blue); color:#fff; border:0; border-radius:6px; padding:7px 13px; font-size:12.5px; cursor:pointer; text-decoration:none; display:inline-block; }
+  button.sec, a.btn.sec { background:var(--soft); color:var(--ink); border:1px solid var(--line); }
+  button.danger { background:var(--bad); } button:disabled { opacity:.5; cursor:default; }
+  .layout { display:flex; height:calc(100vh - 51px); }
+  .left { width:360px; border-right:1px solid var(--line); overflow:auto; padding:14px; }
+  .right { flex:1; overflow:auto; padding:16px 24px 40px; }
+  textarea, input[type=text] { width:100%; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; margin-bottom:8px; }
+  h3 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:18px 0 8px; }
+  h2 { font-size:15px; margin:0 0 6px; }
+  .case { padding:9px 10px; border-radius:8px; margin-bottom:7px; background:var(--panel); border:1px solid var(--line); cursor:pointer; }
+  .case.sel { border-color:var(--blue); } .case .id { font-size:11px; color:var(--mut); } .case .d { margin-top:2px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:10.5px; font-weight:600; border:1px solid currentColor; }
+  .s-COMPLETED,.s-DONE,.s-PASS { color:var(--good); } .s-FAILED,.s-ABORTED,.s-FAIL,.s-NOT_SUPPORTED { color:var(--bad); }
+  .s-WAITING_FOR_HUMAN { color:var(--hil); } .s-WARN,.s-SKIPPED { color:var(--warn); }
+  .s-PLANNING,.s-EXECUTING,.s-VALIDATING,.s-REPORTING,.s-RUNNING,.s-RECEIVED { color:var(--blue); }
+  .flow { display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:10px 0 14px; }
+  .node { min-width:118px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--panel); font-size:11.5px; font-weight:600; color:var(--mut); }
+  .node small { display:block; font-weight:400; margin-top:3px; }
+  .node.active { border-color:var(--blue); color:var(--ink); box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 25%,transparent); }
+  .node.done { border-color:var(--good); color:var(--ink); } .node.fail { border-color:var(--bad); color:var(--ink); }
+  .node.hil { border-color:var(--hil); color:var(--ink); }
+  .node .sub { margin-top:6px; display:flex; flex-direction:column; gap:3px; }
+  .node .chip { font-size:10.5px; font-weight:500; padding:2px 6px; border-radius:5px; background:var(--soft); }
+  .arrow { width:22px; align-self:center; height:2px; background:var(--line); flex:none; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin-bottom:12px; }
+  .hilbox { border:2px solid var(--hil); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .ev { padding:5px 0; border-top:1px solid var(--line); font-size:12.5px; } .ev .src { color:var(--mut); font-size:11px; }
+  .chk { font-size:12px; padding:2px 0; } .chk.ok { color:var(--good); } .chk.no { color:var(--bad); font-weight:600; }
+  pre { background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:10px; font-size:11.5px; white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; }
+  .draft { white-space:pre-wrap; line-height:1.5; }
+  .mut { color:var(--mut); } .files a { cursor:pointer; color:var(--blue); display:block; font-size:12px; }
+  .seg { display:inline-flex; gap:0; margin-left:10px; vertical-align:middle; }
+  .seg button { border-radius:0; border:1px solid var(--line); padding:5px 12px; }
+  .seg button:first-child { border-radius:6px 0 0 6px; } .seg button:last-child { border-radius:0 6px 6px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ROA Agentic Orchestrator</h1>
+  <span class="mut" id="harness"></span>
+  <span class="grow"></span>
+  <button class="sec" onclick="showHarness()">Harness &amp; agents</button>
+  <button class="sec" onclick="showDashboard()">Dashboard</button>
+  <a class="btn sec" id="dashLink" href="#" target="_blank" title="Open the dashboard in its own tab">Dashboard ↗</a>
+</header>
+<div class="layout">
+  <div class="left">
+    <h3 style="margin-top:0">New case</h3>
+    <textarea id="desc" rows="4" placeholder="Case description…"></textarea>
+    <input type="text" id="prop" placeholder="Property name (optional)">
+    <button onclick="createCase()">Submit case</button>
+    <h3>Cases</h3><div id="list"></div>
+  </div>
+  <div class="right" id="detail"><span class="mut">Select a case, or submit a new one.</span></div>
+</div>
+<script>
+let embKey = '', sub = 'case', lastSig = '', sel = null, cases = [], dash = 'http://localhost:8200', view = 'case', fileOpen = null, fileText = '';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const badge = s => `<span class="badge s-${s}">${String(s).replace(/_/g,' ')}</span>`;
+
+async function api(path, opts) { const r = await fetch(path, opts); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText); return r.json(); }
+async function createCase() {
+  const description = desc.value.trim(); if (!description) return;
+  const r = await api('/cases', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description, property_name: prop.value.trim() || null})});
+  desc.value = ''; prop.value = ''; sel = r.case_id; view = 'case'; sub = 'case'; embKey = ''; location.hash = 'case=' + sel; refresh();
+}
+async function decide(hil_id, decision, extra = {}) {
+  try { await api(`/cases/${sel}/hil`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({hil_id, decision, ...extra})}); }
+  catch (e) { alert(e.message); }
+  refresh();
+}
+function hilPlan(id) { const ids = [...document.querySelectorAll('.planagent:checked')].map(x => x.value); decide(id, 'continue_with_agents', {agent_ids: ids}); }
+function hilVal(id, d) { decide(id, d, {comment: (document.getElementById('note')||{}).value || null}); }
+function hilFinal(id, d) {
+  let comment = null;
+  if (d === 'CHANGES_REQUESTED') { comment = prompt('What should change?'); if (comment === null) return; }
+  decide(id, d, {comment});
+}
+async function openFile(p) { fileOpen = p; fileText = (await api(`/cases/${sel}/files/${p}`)).content; render(); }
+
+function flowNodes(cs) {
+  const st = cs.stage, planned = cs.plan ? cs.plan.agent_ids : [], p = cs.pending_hil;
+  const order = ['RECEIVED','PLANNING','EXECUTING','VALIDATING','REPORTING'];
+  const idx = order.indexOf(st), end = ['COMPLETED','FAILED','ABORTED'].includes(st);
+  const cls = (i, extra) => end ? (st === 'COMPLETED' || i < (extra ?? 9) ? 'done' : '') : (idx === i ? 'active' : (idx > i ? 'done' : ''));
+  const waiting = st === 'WAITING_FOR_HUMAN';
+  const hilStage = p ? p.stage : null;
+  const agentChips = planned.map(a => { const t = [...cs.tasks].reverse().find(x => x.agent_id === a); const v = [...cs.verdicts].reverse().find(x => x.agent_id === a);
+    return `<span class="chip">${a.replace('_agent','')}: ${t ? t.status : 'PENDING'}${v ? ' · ' + v.status : ''}</span>`; }).join('');
+  const nodes = [
+    ['Intake', 'guardrails', cs.guardrail_events.length ? 'done' : '', ''],
+    ['Planner agent', 'understanding + plan', waiting && (hilStage==='plan'||hilStage==='input') ? 'hil' : cls(1), ''],
+    ['Worker agents', 'sequential', waiting && hilStage==='agent' ? 'hil' : cls(2), `<div class="sub">${agentChips || '<span class="chip">no plan yet</span>'}</div>`],
+    ['Validation', 'per-agent checks', waiting && hilStage==='validation' ? 'hil' : cls(3), ''],
+    ['Reporting', 'report + draft', cls(4), ''],
+    ['Human approval', 'final', waiting && hilStage==='report' ? 'hil' : '', ''],
+    ['Finalize', '', st==='COMPLETED' ? 'done' : (st==='FAILED'||st==='ABORTED' ? 'fail' : ''), ''],
+  ];
+  return `<div class="flow">${nodes.map((n, i) => `<div class="node ${n[2]}">${n[0]}<small>${n[1]}</small>${n[3]}</div>${i < nodes.length-1 ? '<div class="arrow"></div>' : ''}`).join('')}</div>`;
+}
+
+function hilPanel(cs) {
+  const p = cs.pending_hil; if (!p) return '';
+  const id = p.hil_id, busy = p.resuming ? 'disabled' : '';
+  let body = '';
+  if (p.stage === 'input') body = `<button ${busy} onclick="decide('${id}','continue')">Continue anyway</button><button class="danger" ${busy} onclick="decide('${id}','abort')">Abort case</button>`;
+  else if (p.stage === 'plan') body = `<div>Choose agents (they run sequentially, in canonical order):</div>` + (p.context.available_agents||[]).map(a => `<div class="chk"><label><input type="checkbox" class="planagent" value="${a}"> ${a}</label></div>`).join('')
+      + `<div class="row"><button ${busy} onclick="hilPlan('${id}')">Continue with selected</button><button class="danger" ${busy} onclick="decide('${id}','abort')">Abort case</button></div>`;
+  else if (p.stage === 'agent') body = `<button ${busy} onclick="decide('${id}','retry')">Retry ${esc(p.agent_id)}</button><button class="sec" ${busy} onclick="decide('${id}','continue')">Continue without it</button><button class="danger" ${busy} onclick="decide('${id}','abort')">Abort case</button>`;
+  else if (p.stage === 'validation') body = `<input type="text" id="note" placeholder="Note (recorded in the report if you continue)">`
+      + `<div class="row">${(p.failing_agents||[]).map(a => `<button ${busy} onclick="hilVal('${id}','retry:${a}')">Retry ${a}</button>`).join('')}<button class="sec" ${busy} onclick="hilVal('${id}','continue_with_note')">Continue with note</button><button class="danger" ${busy} onclick="hilVal('${id}','abort')">Abort case</button></div>`;
+  else body = `<div class="draft panel">${esc(cs.response_draft || '')}</div><div class="row"><button ${busy} onclick="hilFinal('${id}','APPROVED')">Approve</button>${p.options.includes('CHANGES_REQUESTED') ? `<button class="sec" ${busy} onclick="hilFinal('${id}','CHANGES_REQUESTED')">Request changes</button>` : ''}<button class="danger" ${busy} onclick="hilFinal('${id}','REJECTED')">Reject</button></div>`;
+  return `<div class="panel hilbox"><h2>Human in the loop: ${p.type.replace('_',' ')} (${p.stage})</h2><div>${esc(p.reason)}</div><div style="margin-top:8px">${body}</div></div>`;
+}
+
+function agentsPanel(cs) {
+  return (cs.plan ? cs.plan.agent_ids : []).map(a => {
+    const tasks = cs.tasks.filter(t => t.agent_id === a), t = tasks[tasks.length-1];
+    const v = [...cs.verdicts].reverse().find(x => x.agent_id === a);
+    const ev = (t && t.result ? t.result.evidence : []).map(e => `<div class="ev">${esc(e.claim)}<div class="src">via ${esc(e.source.tool)} · call ${e.source.call_id} · confidence ${e.confidence}</div></div>`).join('');
+    const checks = v ? v.checks.map(c => `<div class="chk ${c.passed ? 'ok' : 'no'}">${c.passed ? '✓' : '✗'} ${c.name}: ${esc(c.detail)}</div>`).join('') + (v.judge ? `<div class="chk">Judge (${esc(v.judge.model)}): <b>${v.judge.verdict}</b> — ${esc(v.judge.rationale)}</div>` : '') + (v.judge_unavailable ? '<div class="chk">Judge unavailable: deterministic checks only</div>' : '') : '<div class="mut">Not validated yet.</div>';
+    return `<div class="panel"><h2>${a} ${t ? badge(t.status) : ''} ${v ? badge(v.status) : ''} <span class="mut">attempt ${tasks.length}</span></h2>
+      ${t && t.result && t.result.reason ? `<div class="chk no">${esc(t.result.reason)}</div>` : ''}${ev || '<div class="mut">No evidence.</div>'}<h3>Validation</h3>${checks}</div>`;
+  }).join('') || '<div class="mut">No plan yet.</div>';
+}
+
+function render() {
+  const el = document.getElementById('detail');
+  if (view !== 'case') return;
+  const cs = cases.find(c => c.case.case_id === sel);
+  if (!cs) { el.innerHTML = '<span class="mut">Select a case, or submit a new one.</span>'; return; }
+  if (sub !== 'case') return renderEmbedded(cs);
+  embKey = '';
+  const u = cs.understanding, p = cs.plan;
+  const ge = cs.guardrail_events.map(e => `<div class="chk ${e.passed ? 'ok' : 'no'}">${e.passed ? '✓' : '✗'} ${e.point}/${e.rule}: ${esc(e.detail)}</div>`).join('');
+  const hd = cs.hil_decisions.map(d => `<div class="chk">${d.hil_id} (${d.stage}): <b>${esc(d.decision)}</b>${d.comment ? ' — ' + esc(d.comment) : ''} <span class="mut">waited ${Math.round(d.waited_ms/1000)} s</span></div>`).join('');
+  el.innerHTML = `
+    <h2>${cs.case.case_id} ${badge(cs.stage)} ${switcher(cs)}</h2>
+    <div>${esc(cs.case.description)}</div>
+    ${u ? `<div class="mut" style="margin-top:4px">Understanding: ${esc(u.case_type_hint || '?')} · ${u.time_horizon} · property ${esc(u.property_name || '?')}</div>` : ''}
+    ${p ? `<div class="mut">Plan (${p.source}): flow <b>${p.case_type}</b> → ${p.agent_ids.join(' → ')}. ${esc(p.reasoning)}</div>` : ''}
+    ${cs.final_reason ? `<div class="mut">Outcome: ${esc(cs.final_reason)}</div>` : ''}
+    ${flowNodes(cs)}
+    ${hilPanel(cs)}
+    <div class="grid"><div>${agentsPanel(cs)}</div><div>
+      <div class="panel"><h2>Guardrail events</h2>${ge || '<span class="mut">none</span>'}</div>
+      <div class="panel"><h2>Human decisions</h2>${hd || '<span class="mut">none</span>'}</div>
+      ${cs.caveats.length ? `<div class="panel"><h2>Caveats</h2>${cs.caveats.map(c => `<div class="chk">• ${esc(c)}</div>`).join('')}</div>` : ''}
+      ${cs.response_draft && !cs.pending_hil ? `<div class="panel"><h2>Response draft</h2><div class="draft">${esc(cs.response_draft)}</div></div>` : ''}
+      <div class="panel"><h2>LLM usage</h2><span class="mut">${cs.llm_usage.calls} calls · ${cs.llm_usage.prompt_tokens} prompt / ${cs.llm_usage.completion_tokens} completion tokens · harness v${cs.harness_version} (${cs.harness_hash.slice(0,12)})</span></div>
+      <div class="panel"><h2>Run files (agent logs, validation logs, report)</h2><div class="files" id="files"></div>${fileOpen ? `<pre>${esc(fileText)}</pre>` : ''}</div>
+    </div></div>`;
+  loadFiles(cs.case.case_id);
+}
+function switcher(cs) {
+  const b = (id, label) => `<button class="${sub === id ? '' : 'sec'}" onclick="setSub('${id}')">${label}</button>`;
+  return `<span class="seg">${b('case', 'Case')}${b('trajectory', 'Trajectory')}${b('trace', 'Trace')}</span>
+    <a class="btn sec" style="margin-left:8px" href="${dash}/#trace=${cs.trace_id}&tab=${sub === 'trajectory' ? 'trajectory' : 'traces'}" target="_blank" title="Open in the dashboard, new tab">↗</a>`;
+}
+function setSub(s) { sub = s; embKey = ''; lastSig = ''; render(); }
+function pick(id) { sel = id; view = 'case'; fileOpen = null; embKey = ''; lastSig = ''; location.hash = 'case=' + id; render(); renderList(); }
+function renderEmbedded(cs) {
+  const key = cs.case.case_id + '|' + sub;
+  if (embKey === key && document.getElementById('emb')) return;  // the iframe polls by itself; never reload it on a state tick
+  embKey = key;
+  const tab = sub === 'trajectory' ? 'trajectory' : 'traces';
+  detail.innerHTML = `<h2>${cs.case.case_id} ${badge(cs.stage)} ${switcher(cs)}</h2>
+    <div class="mut">${sub === 'trajectory' ? 'Agent trajectory: the path this case took, tool calls per agent, validation and human steps.' : 'Full orchestration trace: every stage, agent, tool call, LLM call and human wait.'} Live from the observability dashboard (separate process). If this stays blank, start it with scripts\\start.ps1.</div>
+    <iframe id="emb" src="${dash}/?embed=1#trace=${cs.trace_id}&tab=${tab}" style="width:100%;height:calc(100vh - 200px);border:1px solid var(--line);border-radius:9px;background:var(--panel);margin-top:8px"></iframe>`;
+}
+function showDashboard() {
+  view = 'dashboard'; sel = null; embKey = ''; location.hash = ''; renderList();
+  detail.innerHTML = `<h2>Observability dashboard <a class="btn sec" style="margin-left:8px" href="${dash}/" target="_blank">Open in new tab ↗</a></h2>
+    <div class="mut">Metrics across all cases. Pick a case in the Trajectory tab, or open one from the case list to see it in context.</div>
+    <iframe src="${dash}/?embed=1#tab=metrics" style="width:100%;height:calc(100vh - 170px);border:1px solid var(--line);border-radius:9px;background:var(--panel);margin-top:8px"></iframe>`;
+}
+function fromHash() {
+  const m = location.hash.match(/case=([A-Za-z0-9-]+)/);
+  if (m && m[1] !== sel) { sel = m[1]; view = 'case'; embKey = ''; lastSig = ''; fileOpen = null; render(); renderList(); }
+}
+async function loadFiles(id) {
+  try { const f = await api(`/cases/${id}/files`); const el = document.getElementById('files'); if (el) el.innerHTML = f.map(p => `<a onclick="openFile('${p}')">${p}</a>`).join('') || '<span class="mut">none yet</span>'; } catch (e) {}
+}
+function renderList() {
+  list.innerHTML = cases.map(cs => `<div class="case ${cs.case.case_id === sel ? 'sel' : ''}" onclick="pick('${cs.case.case_id}')">
+    <div class="id">${cs.case.case_id} ${badge(cs.stage)}</div><div class="d">${esc(cs.case.description).slice(0, 90)}</div></div>`).join('') || '<div class="mut">No cases yet.</div>';
+}
+async function showHarness() {
+  view = 'harness'; sel = null; embKey = ''; location.hash = ''; renderList();
+  const [h, a] = await Promise.all([api('/harness'), api('/agents')]);
+  detail.innerHTML = `<h2>Harness v${h.version} ${badge(h.intact ? 'PASS' : 'FAIL')} <span class="mut">${h.intact ? 'intact' : 'TAMPERED'} · sha256 ${h.hash.slice(0,16)}…</span></h2>
+    <div class="mut">Definitions under harness/ are hash-locked and read-only to every agent. Mutable data lives in runtime/.</div>
+    <div class="grid" style="margin-top:12px">${a.map(x => `<div class="panel"><h2>${x.display_name} <span class="mut">v${x.version}</span></h2><div>${esc(x.purpose)}</div>
+      <div class="mut">tools: ${x.tools_allowed.join(', ')}</div><div class="mut">contract: ${esc(JSON.stringify(x.expected_evidence))}</div>
+      <h3>MEMORY.md (writable by this agent only)</h3><pre>${esc(x.memory || '(empty)')}</pre></div>`).join('')}</div>
+    <h3>Flows</h3><pre>${esc(JSON.stringify(h.flows, null, 2))}</pre><h3>Step policy</h3><pre>${esc(JSON.stringify(h.step_policy, null, 2))}</pre>`;
+}
+async function refresh() {
+  try { cases = await api('/cases'); } catch (e) { return; }
+  renderList();
+  if (view === 'case') {  // re-render only on change so checkboxes / notes / open files are not wiped by polling
+    const sig = JSON.stringify(cases.find(c => c.case.case_id === sel) || null);
+    if (sig !== lastSig) { lastSig = sig; render(); }
+  }
+}
+(async () => {
+  try { const c = await api('/config'); dash = c.dashboard_url; const h = await api('/health'); harness.textContent = `harness v${h.harness_version} · ${h.harness_hash.slice(0,10)} · ${h.agents_in_process.length} agents in one process`; } catch (e) {}
+  dashLink.href = dash; fromHash(); refresh(); setInterval(refresh, 1500);
+  addEventListener('hashchange', fromHash);
+})();
+</script>
+</body>
+</html>
