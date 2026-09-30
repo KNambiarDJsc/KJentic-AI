@@ -32,6 +32,23 @@ The harness is hash-locked: it is read-only on disk, its hash is verified when e
 
 Not by an LLM guessing. Each agent's contract (required tools, minimum evidence, confidence floors) is in its `AGENT.md`. The validation layer checks it deterministically: required tools were called, every piece of evidence traces to a tool call the harness recorded, every number in a claim appears in that tool's output, confidence is above the floor. Only then does an LLM judge assess semantic relevance, against the same declared contract. Agents cannot invent evidence: the harness creates it from tool calls.
 
+## Harness Config Critic (advisory)
+
+`roa/validation/critic.py` exposes `critique_harness(bundle) -> list[Finding]`, a deterministic consistency check of the validation configuration. It is pure (no I/O, no LLM, no state), reads only the loaded `HarnessBundle`, and reports every problem in one call. It is an explicit callable: nothing calls it at startup or from the graph, and it does not change how any case is validated.
+
+It complements `load_harness`, which already rejects broken tool, flow and agent references, and does not repeat those checks. It covers what the loader never inspected:
+
+- `validation.json`: the `deterministic_checks` list against the checks `_deterministic` actually runs (missing, unknown, duplicate); one severity per check, valued `fail` or `warn`; the `judge` block; unknown top-level keys.
+- Each `AGENT.md`: `expected_evidence` types, ranges (floors in [0, 1], integer `min_evidence` of at least 1), feasibility against `max_tool_calls`, unknown keys; `semantic_check`, `enabled`, `handles`, `max_tool_calls`, `timeout_s` types (the runtime uses them as flags, in `.lower()` / `', '.join`, and inside `min()` against the guardrail budgets); `semantic_check` while the judge is disabled; `allowed_unknowns`, which nothing reads.
+
+Findings carry a severity (`error` or `warn`), a code, a location and a message. On the real harness the only finding is a `warn`: `severity.judge` is never read.
+
+Known limits: the list of check names is duplicated in the critic, and a test compares it with what `_deterministic` emits, so a new runtime check fails that test until the critic is updated. The critic reports; it does not block.
+
+## Derived validation cases (test tooling)
+
+`tests/derived_cases.py` derives boundary cases from an agent's declared contract, as plain data, and `tests/test_derive.py` runs them through the real `_deterministic` checks: `min_evidence` = 3 gives 3 items valid and 2 invalid; a 0.7 floor gives 0.7 valid and 0.69 invalid; one case per required tool being missing; a tool outside the allow-list; an agent status other than DONE. Each case names the check it targets and declares any other check it is known to trip (removing a single-tool agent's only required tool also leaves no evidence), and the run requires the validator's failures to equal that set exactly. The expectations come from an independent restatement of the semantics, which a test compares with the real validator over a grid of scenarios. It supplements `tests/test_validation.py`; it does not replace it, and it is not part of the runtime.
+
 ## Observability
 
 OpenTelemetry, one trace per case, covering every stage, agent, tool call, LLM call, guardrail, validator, report step and human wait. A separate dashboard process (port 8200) receives the traces and shows a waterfall per case plus aggregate metrics: latency by component, validation verdicts and failed checks, human-wait time by stage, and tokens by model. Human waits can last hours, so they are recorded as their own spans and never held open. Nothing about tracing lives inside the agents.
@@ -64,4 +81,5 @@ Result: a single-agent case went from 20-34 s to 8-13 s end to end; average LLM 
 - Immutability is enforcement for in-process code, not a sandbox; tampering is detected at the next case, not prevented.
 - No API authentication yet. Single process, sqlite: fine for a POC, not for load.
 - No historical-case retrieval yet. The agent `MEMORY.md` files and a retrieval tool are the intended place for it.
+- The Config Critic is not called at startup or from the graph yet (it is an explicit, advisory callable).
 - A server restart marks running cases as interrupted; cases waiting on a human resume normally.
