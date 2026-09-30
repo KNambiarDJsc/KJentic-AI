@@ -304,6 +304,18 @@ Run the tests (offline; a fake LLM, no gateway needed):
 python -m pytest
 ```
 
+### Run with Docker Compose
+
+```bash
+cp .env.example .env        # set ROA_LLM_BASE_URL and ROA_LLM_API_KEY
+docker compose up --build   # orchestrator + UI on :8100, dashboard on :8200
+docker compose down         # stop (add -v to also delete case history and traces)
+```
+
+One image runs both processes. Case files, the orchestrator database and dashboard traces live in named volumes, so they survive restarts. `harness/` is baked into the image and stays hash-locked.
+
+To let other people on the network use it, set `PUBLIC_HOST` in `.env` to this machine's LAN IP or hostname (browsers use it to reach the dashboard from the UI and back), and allow inbound TCP 8100 and 8200 through the host firewall. The app has no authentication, so only do this on a trusted network. If the LLM gateway runs on the host machine, use `host.docker.internal` instead of `localhost` in `ROA_LLM_BASE_URL`. Host ports can be changed with `ORCHESTRATOR_HOST_PORT` and `DASHBOARD_HOST_PORT`.
+
 ## API reference
 
 Orchestrator (`:8100`):
